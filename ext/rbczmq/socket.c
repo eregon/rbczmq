@@ -23,7 +23,7 @@ void rb_czmq_mark_sock(void *ptr)
         if (sock->verbose) {
             zclock_log ("I: %s socket %p, context %p: GC mark", sock->flags & ZMQ_SOCKET_DESTROYED ? "(closed)" : zsocket_type_str(sock->socket), sock, sock->ctx);
         }
-        rb_gc_mark(sock->endpoints);
+        rb_gc_mark(rb_tr_managed_from_handle(sock->endpoints));
         rb_gc_mark(sock->thread);
         rb_gc_mark(sock->context);
         rb_gc_mark(sock->monitor_endpoint);
@@ -108,7 +108,7 @@ static VALUE rb_czmq_socket_endpoints(VALUE obj)
 {
     zmq_sock_wrapper *sock = NULL;
     GetZmqSocket(obj);
-    return sock->endpoints;
+    return rb_tr_managed_from_handle(sock->endpoints);
 }
 
 /*
@@ -222,7 +222,7 @@ static VALUE rb_czmq_socket_bind(VALUE obj, VALUE endpoint)
     if (sock->verbose)
         zclock_log ("I: %s socket %p: bound \"%s\"", zsocket_type_str(sock->socket), obj, endpoint_string);
     sock->state = ZMQ_SOCKET_BOUND;
-    rb_ary_push(sock->endpoints, rb_str_new_cstr(endpoint_string));
+    rb_ary_push(rb_tr_managed_from_handle(sock->endpoints), rb_str_new_cstr(endpoint_string));
     free(endpoint_string);
     return INT2NUM(rc);
 }
@@ -260,7 +260,7 @@ static VALUE rb_czmq_socket_connect(VALUE obj, VALUE endpoint)
     if (sock->verbose)
         zclock_log ("I: %s socket %p: connected \"%s\"", zsocket_type_str(sock->socket), obj, endpoint_string);
     sock->state = ZMQ_SOCKET_CONNECTED;
-    rb_ary_push(sock->endpoints, rb_str_new_cstr(endpoint_string));
+    rb_ary_push(rb_tr_managed_from_handle(sock->endpoints), rb_str_new_cstr(endpoint_string));
     free(endpoint_string);
     return Qtrue;
 }
@@ -310,8 +310,8 @@ static VALUE rb_czmq_socket_disconnect(VALUE obj, VALUE endpoint)
     ZmqAssert(rc);
     if (sock->verbose)
         zclock_log ("I: %s socket %p: disconnected \"%s\"", zsocket_type_str(sock->socket), obj, StringValueCStr(endpoint));
-    rb_ary_delete(sock->endpoints, endpoint);
-    long endpoint_count = RARRAY_LEN(sock->endpoints);
+    rb_ary_delete(rb_tr_managed_from_handle(sock->endpoints), endpoint);
+    long endpoint_count = RARRAY_LEN(rb_tr_managed_from_handle(sock->endpoints));
     if (endpoint_count == 0) {
         sock->state = ZMQ_SOCKET_DISCONNECTED;
     }
@@ -364,8 +364,8 @@ static VALUE rb_czmq_socket_unbind(VALUE obj, VALUE endpoint)
     ZmqAssert(rc);
     if (sock->verbose)
         zclock_log ("I: %s socket %p: unbound \"%s\"", zsocket_type_str(sock->socket), obj, StringValueCStr(endpoint));
-    rb_ary_delete(sock->endpoints, endpoint);
-    long endpoint_count = RARRAY_LEN(sock->endpoints);
+    rb_ary_delete(rb_tr_managed_from_handle(sock->endpoints), endpoint);
+    long endpoint_count = RARRAY_LEN(rb_tr_managed_from_handle(sock->endpoints));
     if (endpoint_count == 0) {
         sock->state = ZMQ_SOCKET_DISCONNECTED;
     }
@@ -1777,7 +1777,8 @@ static VALUE rb_czmq_socket_monitor_thread(void *arg)
     void *s = zsocket_new (sock->ctx, ZMQ_PAIR);
     assert (s);
 
-    rc = zmq_connect (s, StringValueCStr(sock->monitor_endpoint));
+    VALUE monitor_endpoint = rb_tr_managed_from_handle(sock->monitor_endpoint);
+    rc = zmq_connect (s, StringValueCStr(monitor_endpoint));
     assert (rc == 0);
 
     rb_thread_schedule();
@@ -1813,7 +1814,7 @@ static VALUE rb_czmq_socket_monitor_thread(void *arg)
         }
 
         if (method != Qnil) {
-            rb_funcall(sock->monitor_handler, method, 2, endpoint_str, INT2FIX(event.value));
+            rb_funcall(rb_tr_managed_from_handle(sock->monitor_handler), method, 2, endpoint_str, INT2FIX(event.value));
         }
 
         /* once the socket is marked as destroyed, it appears to be not safe to call receive on it. */
@@ -1869,9 +1870,9 @@ static VALUE rb_czmq_socket_monitor(int argc, VALUE *argv, VALUE obj)
     Check_Type(events, T_FIXNUM);
     rc = zmq_socket_monitor(sock->socket, StringValueCStr(endpoint), NUM2INT(events));
     if (rc == 0) {
-        sock->monitor_endpoint = endpoint;
-        sock->monitor_handler = handler;
-        sock->monitor_thread = rb_thread_create(rb_czmq_socket_monitor_thread, (void*)sock);
+        sock->monitor_endpoint = rb_tr_handle_for_managed_leaking(endpoint);
+        sock->monitor_handler = rb_tr_handle_for_managed_leaking(handler);
+        sock->monitor_thread = rb_tr_handle_for_managed_leaking(rb_thread_create(rb_czmq_socket_monitor_thread, (void*)sock));
         return Qtrue;
     } else {
         return Qfalse;

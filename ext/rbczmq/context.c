@@ -91,11 +91,11 @@ VALUE rb_czmq_nogvl_zsocket_destroy(void *ptr)
  */
 void rb_czmq_context_destroy_socket(zmq_sock_wrapper* socket)
 {
-    if (socket == NULL || socket->context == NULL) {
+    if (socket == NULL || rb_tr_managed_from_handle(socket->context) == NULL) {
         return;
     }
 
-    if (socket && socket->context == Qnil) {
+    if (socket && rb_tr_managed_from_handle(socket->context) == Qnil) {
         // A socket with a context object of Qnil is created by ZMQ::Beacon#new.
         // zbeacon is responsible for closing this socket in its own context, we will simply mark
         // it as destroyed and let the ZMQ::Beacon object do the clean up when its internal
@@ -348,12 +348,12 @@ VALUE rb_czmq_socket_alloc(VALUE context, zctx_t *zctx, void *s)
     }
     sock->verbose = false;
     sock->state = ZMQ_SOCKET_PENDING;
-    sock->endpoints = rb_ary_new();
-    sock->thread = rb_thread_current();
-    sock->context = context;
-    sock->monitor_endpoint = Qnil;
-    sock->monitor_handler = Qnil;
-    sock->monitor_thread = Qnil;
+    sock->endpoints = rb_tr_handle_for_managed_leaking(rb_ary_new());
+    sock->thread = rb_tr_handle_for_managed_leaking(rb_thread_current());
+    sock->context = rb_tr_handle_for_managed_leaking(context);
+    sock->monitor_endpoint = rb_tr_handle_for_managed_leaking(Qnil);
+    sock->monitor_handler = rb_tr_handle_for_managed_leaking(Qnil);
+    sock->monitor_thread = rb_tr_handle_for_managed_leaking(Qnil);
     rb_obj_call_init(socket, 0, NULL);
     return socket;
 }

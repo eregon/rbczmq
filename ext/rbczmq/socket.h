@@ -46,8 +46,8 @@ typedef struct {
   } while(0)
 
 #define ZmqSockGuardCrossThread(sock) \
-  if ((sock)->thread != rb_thread_current()) \
-      rb_raise(rb_eZmqError, "Cross thread violation for %s socket %p: created in thread %p, invoked on thread %p", zsocket_type_str((sock)->socket), (void *)(sock), (void *)(sock)->thread, (void *)rb_thread_current());
+  if (rb_tr_managed_from_handle((sock)->thread) != rb_thread_current()) \
+      rb_raise(rb_eZmqError, "Cross thread violation for %s socket %p: created in thread %p, invoked on thread %p", zsocket_type_str((sock)->socket), (void *)(sock), (void *)rb_tr_managed_from_handle((sock)->thread), (void *)rb_thread_current());
 
 #define ZmqAssertSockOptFor(sock_type) \
     if (zsocket_type(sock->socket) != sock_type) \
