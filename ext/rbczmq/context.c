@@ -57,7 +57,7 @@ static void rb_czmq_free_ctx(zmq_ctx_wrapper *ctx)
     rb_thread_call_without_gvl(rb_czmq_nogvl_zctx_destroy, (void *)ctx, RUBY_UBF_IO, 0);
 
     ctx->ctx = NULL;
-    rb_hash_aset(ctx_map, ctx->pidValue, Qnil);
+    rb_hash_aset(ctx_map, PIDT2NUM(ctx->pid), Qnil);
     zlist_destroy(&ctx->sockets);
 }
 
@@ -142,7 +142,7 @@ static void rb_czmq_mark_ctx_gc(void *ptr)
 {
     zmq_ctx_wrapper *ctx = (zmq_ctx_wrapper *)ptr;
     if (ctx) {
-        rb_gc_mark(ctx->pidValue);
+        /* rb_gc_mark(ctx->pidValue); */
     }
 }
 
@@ -194,12 +194,12 @@ static VALUE rb_czmq_ctx_s_new(int argc, VALUE *argv, VALUE context)
     ZmqAssertObjOnAlloc(ctx->ctx, ctx);
     ctx->flags = 0;
     ctx->pid = getpid();
-    ctx->pidValue = get_pid();
+    /* ctx->pidValue = get_pid(); */
     ctx->sockets = zlist_new();
     ctx->file = rb_sourcefile();
     ctx->line = rb_sourceline();
     rb_obj_call_init(context, 0, NULL);
-    rb_hash_aset(ctx_map, ctx->pidValue, context);
+    rb_hash_aset(ctx_map, PIDT2NUM(ctx->pid), context);
     if (!NIL_P(io_threads)) rb_czmq_ctx_set_iothreads(context, io_threads);
     return context;
 }
