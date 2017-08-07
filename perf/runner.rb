@@ -58,7 +58,7 @@ class Runner
 
   private
   def register_signal_handlers
-    %w(INT TERM QUIT).each do |sig|
+    %w(INT TERM).each do |sig|
        trap(sig){ stop }
      end
   end
