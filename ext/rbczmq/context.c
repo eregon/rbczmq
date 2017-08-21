@@ -194,7 +194,7 @@ static VALUE rb_czmq_ctx_s_new(int argc, VALUE *argv, VALUE context)
     ZmqAssertObjOnAlloc(ctx->ctx, ctx);
     ctx->flags = 0;
     ctx->pid = getpid();
-    /* ctx->pidValue = get_pid(); */
+    ctx->pidValue = get_pid(); // Storing managed to native
     ctx->sockets = zlist_new();
     ctx->file = rb_sourcefile();
     ctx->line = rb_sourceline();
